@@ -22,6 +22,13 @@ def load_data():
     # Convert 'date' column to datetime
     data['date'] = pd.to_datetime(data['date'])
     
+    # Convert temperature to Celsius
+    data['temperature'] = data['temperature'] * 41 - 8
+    data['feels_like_temperature'] = data['feels_like_temperature'] * 50 - 16
+    
+    # Convert humidity to percentage
+    data['humidity'] = data['humidity'] * 100
+    
     return data
 
 # Load data
@@ -32,12 +39,15 @@ st.title('Advanced Bike Sharing Analysis Dashboard')
 
 # Sidebar
 st.sidebar.header('Dashboard Controls')
+
+# Weather filter
 weather_filter = st.sidebar.multiselect(
     'Select Weather Condition',
     options=data['weather_situation'].unique(),
     default=data['weather_situation'].unique()
 )
 
+# Working day filter
 workingday_filter = st.sidebar.multiselect(
     'Select Day Type',
     options=['Working Day', 'Holiday'],
@@ -51,7 +61,8 @@ start_date, end_date = st.sidebar.date_input(
     'Select Date Range',
     [min_date, max_date],
     min_value=min_date,
-    max_value=max_date
+    max_value=max_date,
+    key='date_range'
 )
 
 # Apply filters
@@ -66,8 +77,78 @@ filtered_data = data[
 if filtered_data.empty:
     st.warning("No data found for the selected filters. Please adjust your selection.")
 else:
+    # Main content
+    st.header('1. Pengaruh Cuaca terhadap Jumlah Peminjaman Sepeda')
+
+    weather_chart = alt.Chart(filtered_data).mark_boxplot().encode(
+        x='weather_situation:O',
+        y='total_count:Q',
+        color='weather_situation:N'
+    ).properties(
+        width=600,
+        height=400,
+        title='Distribusi Jumlah Peminjaman Berdasarkan Kondisi Cuaca'
+    )
+
+    st.altair_chart(weather_chart, use_container_width=True)
+
+    st.write("""
+    Berdasarkan visualisasi, terlihat bahwa kondisi cuaca mempengaruhi jumlah peminjaman sepeda:
+    - Cuaca yang lebih baik (Clear dan Mist/Cloudy) cenderung menghasilkan jumlah peminjaman yang lebih tinggi.
+    - Cuaca yang lebih buruk (Light Rain/Snow dan Heavy Rain/Snow) menghasilkan jumlah peminjaman yang lebih rendah.
+    """)
+
+    st.header('2. Perbedaan Jumlah Peminjaman pada Hari Kerja dan Hari Libur')
+
+    workingday_chart = alt.Chart(filtered_data).mark_boxplot().encode(
+        x='workingday:N',
+        y='total_count:Q',
+        color='workingday:N'
+    ).properties(
+        width=600,
+        height=400,
+        title='Distribusi Jumlah Peminjaman: Hari Kerja vs Hari Libur'
+    )
+
+    st.altair_chart(workingday_chart, use_container_width=True)
+
+    st.write("""
+    Terdapat perbedaan dalam distribusi jumlah peminjaman sepeda antara hari kerja dan hari libur:
+    - Hari kerja cenderung memiliki jumlah peminjaman yang lebih tinggi dan konsisten.
+    - Hari libur memiliki variasi yang lebih besar dalam jumlah peminjaman.
+    """)
+
+    # Additional insights
+    st.header('3. Tren Peminjaman Sepeda Sepanjang Hari')
+
+    hourly_avg = filtered_data.groupby(['hour', 'workingday'])['total_count'].mean().reset_index()
+    
+    daily_trend_chart = alt.Chart(hourly_avg).mark_line().encode(
+        x='hour:O',
+        y='total_count:Q',
+        color='workingday:N',
+        tooltip=['hour', 'workingday', 'total_count']
+    ).properties(
+        width=600,
+        height=400,
+        title='Daily Trend of Bike Rentals'
+    )
+
+    st.altair_chart(daily_trend_chart, use_container_width=True)
+
+    st.write("""
+    Grafik ini menunjukkan tren peminjaman sepeda sepanjang hari untuk hari kerja dan hari libur:
+    - Hari Kerja:
+      - Terdapat dua puncak utama: satu di pagi hari (sekitar jam 08:00) dan satu di sore hari (sekitar jam 17:00-18:00).
+      - Ini mencerminkan pola commuting, di mana orang meminjam sepeda untuk pergi ke dan pulang dari tempat kerja atau sekolah.
+    - Hari Libur:
+      - Tren lebih merata sepanjang hari dengan satu puncak di siang hari (sekitar jam 14:00-15:00).
+      - Ini mungkin mencerminkan penggunaan sepeda untuk rekreasi atau kegiatan akhir pekan.
+    - Kedua tipe hari menunjukkan penurunan penggunaan di malam hari (jam 22:00-05:00).
+    """)
+
     # 1. RFM Analysis
-    st.header('1. RFM Analysis')
+    st.header('4. RFM Analysis')
 
     latest_date = filtered_data['date'].max()
     rfm = filtered_data.groupby('date').agg({
@@ -116,7 +197,7 @@ else:
     st.altair_chart(rfm_dist, use_container_width=True)
 
     # 2. Time Series Decomposition
-    st.header('2. Time Series Decomposition')
+    st.header('5. Time Series Decomposition')
 
     # Resample data to daily frequency
     daily_data = filtered_data.set_index('date')['total_count'].resample('D').sum().reset_index()
@@ -175,7 +256,7 @@ else:
     st.altair_chart(decomposition & trend & seasonal & residual)
 
     # 3. Simple Clustering (without ML)
-    st.header('3. Simple Clustering')
+    st.header('6. Simple Clustering')
 
     # We'll use a simple binning approach for clustering
     filtered_data['temp_bin'] = pd.cut(filtered_data['temperature'], bins=5, labels=['Very Cold', 'Cold', 'Mild', 'Warm', 'Hot'])

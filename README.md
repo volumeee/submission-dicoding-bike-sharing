@@ -20,12 +20,17 @@ This project analyzes bike-sharing data to understand the factors influencing bi
 2. Is there a significant difference in bike rentals between working days and holidays?
 3. What are the temporal patterns in bike rentals?
 4. How do temperature and humidity interact to influence bike rentals?
+5. What insights can be gained from RFM analysis?
+6. What pattern can be observed from time series decomposition?
 
 ## File Structure
 
 - `dashboard/`
   - `main_data.csv`: The main dataset used for analysis
   - `dashboard.py`: Streamlit dashboard script
+- `data/`
+  - `hour.csv`: The dataset used for analysis
+  - `day.csv`: The dataset used for analysis
 - `README.md`: This file
 - `requirements.txt`: List of required Python packages
 
@@ -35,6 +40,8 @@ This project analyzes bike-sharing data to understand the factors influencing bi
 2. Data Preprocessing:
    - Convert date to datetime
    - Map weather situations and working days to descriptive labels
+   - Convert temperature to Celsius
+   - Convert humidity to percentage
 3. Exploratory Data Analysis (EDA):
    - Analyzed the impact of weather on bike rentals
    - Compared bike rentals on working days vs. holidays
@@ -45,22 +52,34 @@ This project analyzes bike-sharing data to understand the factors influencing bi
 
 The Streamlit dashboard (`dashboard.py`) includes:
 
-1. RFM (Recency, Frequency, Monetary) Analysis:
+1. Weather Impact Analysis:
+
+   - Visualizes the distribution of rental patterns
+
+2. Working Days vs. Holidays:
+
+   - Compares bike rental patterns between working days and holidays
+
+3. Daily Trend Analysis:
+
+   - Shows the trend of bike rentals throughout the day for working days and holidays
+
+4. RFM (Recency, Frequency, Monetary) Analysis:
 
    - Visualizes the distribution of rental patterns
    - Provides insights into customer segmentation
 
-2. Time Series Decomposition:
+5. Time Series Decomposition:
 
    - Breaks down the rental data into trend, seasonal, and residual components
    - Helps identify underlying patterns and anomalies
 
-3. Simple Clustering:
+6. Simple Clustering:
 
    - Groups rental patterns based on temperature and humidity
    - Visualizes the relationship between weather conditions and rental frequency
 
-4. Raw Data Display:
+7. Raw Data Display:
    - Option to view the filtered dataset used in the analysis
 
 ## How to Use the Dashboard
@@ -77,6 +96,9 @@ The Streamlit dashboard (`dashboard.py`) includes:
 ## Key Features
 
 - Interactive filters for data exploration
+- Comprehensive analysis of weather impact on bike rentals
+- Comparison of rental patterns between working days and holidays
+- Daily trend analysis
 - RFM analysis for customer segmentation
 - Time series decomposition for trend and seasonality analysis
 - Simple clustering to visualize weather impacts
