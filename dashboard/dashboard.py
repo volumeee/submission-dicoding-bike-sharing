@@ -186,61 +186,77 @@ else:
     # RFM Analysis
     st.header('4. RFM Analysis')
 
+    # Ensure 'date' is in datetime format
+    filtered_data['date'] = pd.to_datetime(filtered_data['date'])
+    filtered_data['datetime'] = filtered_data['date'] + pd.to_timedelta(filtered_data['hour'], unit='h')
 
-    latest_date = filtered_data['date'].max()
-    rfm = filtered_data.groupby('date').agg({
-        'date': 'max',
-        'total_count': ['count', 'sum']
+    # Calculate recency, frequency, and monetary values
+    today = filtered_data['datetime'].max() + pd.Timedelta(hours=1)
+    rfm = filtered_data.groupby('hour').agg({
+        'datetime': lambda x: (today - x.max()).total_seconds() / 3600,  # Recency in hours
+        'record_id': 'count',  # Frequency
+        'total_count': 'sum'  # Monetary (total bike rentals)
     })
 
-    rfm.columns = ['date', 'frequency', 'monetary']
-    rfm = rfm.reset_index(drop=True)
+    # Rename columns
+    rfm.columns = ['Recency', 'Frequency', 'Monetary']
 
-    # Calculate recency
-    rfm['recency'] = (latest_date - rfm['date']).dt.days
+    # Normalize RFM values
+    def normalize(x):
+        if x.max() == x.min():
+            return x - x.min()
+        return (x - x.min()) / (x.max() - x.min())
 
-    # Custom function to create bins
-    def create_bins(x, n_bins=4):
-        min_val = x.min()
-        max_val = x.max()
-        if min_val == max_val:
-            return pd.Series([1] * len(x))
-        
-        bin_edges = [min_val + i*(max_val-min_val)/n_bins for i in range(n_bins+1)]
-        bin_edges[-1] += 0.01  # Add a small value to include the maximum
-        return pd.cut(x, bins=bin_edges, labels=False) + 1  # Use 'labels=False' and add 1 to get scores 1-4
+    rfm_normalized = rfm.apply(normalize)
 
-    # Create RFM score
-    rfm['R'] = create_bins(rfm['recency'], n_bins=4)
-    rfm['F'] = create_bins(rfm['frequency'], n_bins=4)
-    rfm['M'] = create_bins(rfm['monetary'], n_bins=4)
+    # Invert Recency (lower values are better)
+    rfm_normalized['Recency'] = 1 - rfm_normalized['Recency']
 
-    # Reverse the order for recency (lower is better)
-    rfm['R'] = 5 - rfm['R']
+    # Calculate RFM Score
+    rfm['RFM_Score'] = (rfm_normalized['Recency'] * 0.2 + 
+                        rfm_normalized['Frequency'] * 0.4 + 
+                        rfm_normalized['Monetary'] * 0.4)
 
-    rfm['RFM_Score'] = rfm['R'].astype(str) + rfm['F'].astype(str) + rfm['M'].astype(str)
+    # Visualization using Altair
+    rfm_chart = alt.Chart(rfm.reset_index()).mark_circle().encode(
+        x='Recency',
+        y='Frequency',
+        size='Monetary',
+        color='RFM_Score:Q',
+        tooltip=['hour', 'Recency', 'Frequency', 'Monetary', 'RFM_Score']
+    ).properties(
+        width=600,
+        height=400,
+        title='RFM Analysis by Hour'
+    )
 
-    st.write("RFM Analysis Results:")
-    st.write(rfm)
+    st.altair_chart(rfm_chart, use_container_width=True)
 
-    # Visualize RFM distribution
-    rfm_dist = alt.Chart(rfm).mark_circle(size=60).encode(
-        x='recency',
-        y='frequency',
-        color='monetary',
-        tooltip=['date', 'recency', 'frequency', 'monetary', 'RFM_Score']
-    ).interactive()
-
-    st.altair_chart(rfm_dist, use_container_width=True)
+    # Display statistics
+    st.write(rfm.describe())
+    st.write("\nRFM Score Range:", rfm['RFM_Score'].min(), "-", rfm['RFM_Score'].max())
 
     st.write(f"""
     Berdasarkan analisis RFM:
-    - Recency: Rentang nilai dari {rfm['recency'].min()} hingga {rfm['recency'].max()} hari.
-    - Frequency: Rentang nilai dari {rfm['frequency'].min()} hingga {rfm['frequency'].max()} peminjaman.
-    - Monetary: Rentang nilai dari {rfm['monetary'].min():.2f} hingga {rfm['monetary'].max():.2f}.
-    - Skor RFM tertinggi adalah {rfm['RFM_Score'].max()}, yang menunjukkan pelanggan paling bernilai.
-    - Skor RFM terendah adalah {rfm['RFM_Score'].min()}, yang mungkin memerlukan strategi retensi khusus.
+    - Recency: Nilai berkisar dari {rfm['Recency'].min():.2f} hingga {rfm['Recency'].max():.2f} jam.
+    - Frequency: Nilai berkisar dari {rfm['Frequency'].min():.0f} hingga {rfm['Frequency'].max():.0f} penyewaan.
+    - Monetary: Nilai berkisar dari {rfm['Monetary'].min():.2f} hingga {rfm['Monetary'].max():.2f} total penyewaan sepeda.
+    - Skor RFM tertinggi adalah {rfm['RFM_Score'].max():.2f}, menunjukkan jam yang paling berharga.
+    - Skor RFM terendah adalah {rfm['RFM_Score'].min():.2f}, yang mungkin memerlukan strategi perbaikan khusus.
     """)
+
+    # Wawasan tambahan
+    best_hour = rfm['RFM_Score'].idxmax()
+    worst_hour = rfm['RFM_Score'].idxmin()
+
+    st.write(f"""
+    Wawasan tambahan:
+    - Jam paling berharga adalah {best_hour}:00, dengan Skor RFM {rfm['RFM_Score'].max():.2f}.
+    - Jam paling kurang berharga adalah {worst_hour}:00, dengan Skor RFM {rfm['RFM_Score'].min():.2f}.
+    - Jam-jam dengan skor RFM tinggi mungkin merupakan target yang baik untuk promosi atau peningkatan ketersediaan layanan.
+    - Jam-jam dengan skor RFM rendah mungkin memerlukan strategi untuk meningkatkan penyewaan sepeda, seperti diskon khusus di luar jam sibuk.
+    """)
+
 
     # Time Series Decomposition
     st.header('5. Time Series Decomposition')
