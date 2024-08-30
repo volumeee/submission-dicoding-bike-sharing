@@ -3,7 +3,7 @@
 ## Setup environment
 
 ```
-pip install numpy pandas scipy matplotlib seaborn jupyter streamlit altair
+pip install numpy pandas scipy streamlit altair
 ```
 
 ## Run Streamlit app
