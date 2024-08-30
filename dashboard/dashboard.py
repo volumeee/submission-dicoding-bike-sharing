@@ -50,8 +50,8 @@ weather_filter = st.sidebar.multiselect(
 # Working day filter
 workingday_filter = st.sidebar.multiselect(
     'Select Day Type',
-    options=['Working Day', 'Holiday'],
-    default=['Working Day', 'Holiday']
+    options=data['workingday'].unique(),
+    default=data['workingday'].unique()
 )
 
 # Date range selector
@@ -92,10 +92,15 @@ else:
 
     st.altair_chart(weather_chart, use_container_width=True)
 
-    st.write("""
-    Berdasarkan visualisasi, terlihat bahwa kondisi cuaca mempengaruhi jumlah peminjaman sepeda:
-    - Cuaca yang lebih baik (Clear dan Mist/Cloudy) cenderung menghasilkan jumlah peminjaman yang lebih tinggi.
-    - Cuaca yang lebih buruk (Light Rain/Snow dan Heavy Rain/Snow) menghasilkan jumlah peminjaman yang lebih rendah.
+    weather_avg = filtered_data.groupby('weather_situation')['total_count'].mean().sort_values(ascending=False)
+    best_weather = weather_avg.index[0]
+    worst_weather = weather_avg.index[-1]
+
+    st.write(f"""
+    Berdasarkan data yang difilter dari {start_date} hingga {end_date}, terlihat bahwa kondisi cuaca mempengaruhi jumlah peminjaman sepeda:
+    - Cuaca "{best_weather}" menghasilkan jumlah peminjaman tertinggi dengan rata-rata {weather_avg[best_weather]:.2f} peminjaman.
+    - Cuaca "{worst_weather}" menghasilkan jumlah peminjaman terendah dengan rata-rata {weather_avg[worst_weather]:.2f} peminjaman.
+    - Perbedaan antara kondisi cuaca terbaik dan terburuk adalah {weather_avg[best_weather] - weather_avg[worst_weather]:.2f} peminjaman.
     """)
 
     st.header('2. Perbedaan Jumlah Peminjaman pada Hari Kerja dan Hari Libur')
@@ -112,17 +117,33 @@ else:
 
     st.altair_chart(workingday_chart, use_container_width=True)
 
-    st.write("""
-    Terdapat perbedaan dalam distribusi jumlah peminjaman sepeda antara hari kerja dan hari libur:
-    - Hari kerja cenderung memiliki jumlah peminjaman yang lebih tinggi dan konsisten.
-    - Hari libur memiliki variasi yang lebih besar dalam jumlah peminjaman.
-    """)
+    workingday_avg = filtered_data.groupby('workingday')['total_count'].mean()
 
-    # Additional insights
+    if 'Working Day' in workingday_avg.index and 'Holiday' in workingday_avg.index:
+        st.write(f"""
+        Berdasarkan data yang difilter, terdapat perbedaan dalam distribusi jumlah peminjaman sepeda antara hari kerja dan hari libur:
+        - Rata-rata peminjaman pada hari kerja adalah {workingday_avg['Working Day']:.2f}.
+        - Rata-rata peminjaman pada hari libur adalah {workingday_avg['Holiday']:.2f}.
+        - {'Hari kerja' if workingday_avg['Working Day'] > workingday_avg['Holiday'] else 'Hari libur'} memiliki rata-rata peminjaman yang lebih tinggi.
+        - Perbedaan rata-rata peminjaman antara hari kerja dan hari libur adalah {abs(workingday_avg['Working Day'] - workingday_avg['Holiday']):.2f}.
+        """)
+    elif 'Working Day' in workingday_avg.index:
+        st.write(f"""
+        Berdasarkan data yang difilter, hanya terdapat informasi untuk hari kerja:
+        - Rata-rata peminjaman pada hari kerja adalah {workingday_avg['Working Day']:.2f}.
+        """)
+    elif 'Holiday' in workingday_avg.index:
+        st.write(f"""
+        Berdasarkan data yang difilter, hanya terdapat informasi untuk hari libur:
+        - Rata-rata peminjaman pada hari libur adalah {workingday_avg['Holiday']:.2f}.
+        """)
+    else:
+        st.write("Tidak ada data yang tersedia untuk hari kerja atau hari libur berdasarkan filter yang dipilih.")
+
     st.header('3. Tren Peminjaman Sepeda Sepanjang Hari')
 
     hourly_avg = filtered_data.groupby(['hour', 'workingday'])['total_count'].mean().reset_index()
-    
+
     daily_trend_chart = alt.Chart(hourly_avg).mark_line().encode(
         x='hour:O',
         y='total_count:Q',
@@ -136,19 +157,35 @@ else:
 
     st.altair_chart(daily_trend_chart, use_container_width=True)
 
-    st.write("""
-    Grafik ini menunjukkan tren peminjaman sepeda sepanjang hari untuk hari kerja dan hari libur:
+    workday_data = hourly_avg[hourly_avg['workingday'] == 'Working Day']
+    holiday_data = hourly_avg[hourly_avg['workingday'] == 'Holiday']
+
+    if not workday_data.empty:
+        peak_hour_workday = workday_data['total_count'].idxmax()
+        peak_workday_info = f"Puncak peminjaman terjadi pada pukul {workday_data.loc[peak_hour_workday, 'hour']}:00 dengan rata-rata {workday_data.loc[peak_hour_workday, 'total_count']:.2f} peminjaman."
+    else:
+        peak_workday_info = "Tidak ada data untuk hari kerja."
+
+    if not holiday_data.empty:
+        peak_hour_holiday = holiday_data['total_count'].idxmax()
+        peak_holiday_info = f"Puncak peminjaman terjadi pada pukul {holiday_data.loc[peak_hour_holiday, 'hour']}:00 dengan rata-rata {holiday_data.loc[peak_hour_holiday, 'total_count']:.2f} peminjaman."
+    else:
+        peak_holiday_info = "Tidak ada data untuk hari libur."
+
+    st.write(f"""
+    Grafik ini menunjukkan tren peminjaman sepeda sepanjang hari untuk hari kerja dan hari libur berdasarkan data yang difilter:
     - Hari Kerja:
-      - Terdapat dua puncak utama: satu di pagi hari (sekitar jam 08:00) dan satu di sore hari (sekitar jam 17:00-18:00).
-      - Ini mencerminkan pola commuting, di mana orang meminjam sepeda untuk pergi ke dan pulang dari tempat kerja atau sekolah.
+        - {peak_workday_info}
+        - Terlihat dua puncak utama yang mencerminkan pola commuting.
     - Hari Libur:
-      - Tren lebih merata sepanjang hari dengan satu puncak di siang hari (sekitar jam 14:00-15:00).
-      - Ini mungkin mencerminkan penggunaan sepeda untuk rekreasi atau kegiatan akhir pekan.
-    - Kedua tipe hari menunjukkan penurunan penggunaan di malam hari (jam 22:00-05:00).
+        - {peak_holiday_info}
+        - Tren lebih merata sepanjang hari, mungkin mencerminkan penggunaan untuk rekreasi.
+    - Kedua tipe hari menunjukkan penurunan penggunaan di malam hari.
     """)
 
-    # 1. RFM Analysis
+    # RFM Analysis
     st.header('4. RFM Analysis')
+
 
     latest_date = filtered_data['date'].max()
     rfm = filtered_data.groupby('date').agg({
@@ -196,7 +233,16 @@ else:
 
     st.altair_chart(rfm_dist, use_container_width=True)
 
-    # 2. Time Series Decomposition
+    st.write(f"""
+    Berdasarkan analisis RFM:
+    - Recency: Rentang nilai dari {rfm['recency'].min()} hingga {rfm['recency'].max()} hari.
+    - Frequency: Rentang nilai dari {rfm['frequency'].min()} hingga {rfm['frequency'].max()} peminjaman.
+    - Monetary: Rentang nilai dari {rfm['monetary'].min():.2f} hingga {rfm['monetary'].max():.2f}.
+    - Skor RFM tertinggi adalah {rfm['RFM_Score'].max()}, yang menunjukkan pelanggan paling bernilai.
+    - Skor RFM terendah adalah {rfm['RFM_Score'].min()}, yang mungkin memerlukan strategi retensi khusus.
+    """)
+
+    # Time Series Decomposition
     st.header('5. Time Series Decomposition')
 
     # Resample data to daily frequency
@@ -255,7 +301,14 @@ else:
 
     st.altair_chart(decomposition & trend & seasonal & residual)
 
-    # 3. Simple Clustering (without ML)
+    st.write(f"""
+    Analisis dekomposisi time series menunjukkan:
+    - Tren: Terlihat adanya {' peningkatan' if daily_data['trend'].iloc[-1] > daily_data['trend'].iloc[0] else ' penurunan'} umum dalam jumlah peminjaman sepeda selama periode yang dipilih.
+    - Musiman: Pola musiman menunjukkan fluktuasi {' harian' if len(daily_data) > 7 else ' mingguan'} dalam peminjaman sepeda.
+    - Residual: Komponen residual menangkap variasi yang tidak dapat dijelaskan oleh tren atau musiman, yang mungkin disebabkan oleh faktor-faktor eksternal atau acak.
+    """)
+
+    # Simple Clustering
     st.header('6. Simple Clustering')
 
     # We'll use a simple binning approach for clustering
@@ -272,12 +325,97 @@ else:
     ).properties(
         width=500,
         height=400,
-        title='Bike Rental Clusters by Temperature and Humidity'
+        title='Heatmap of Average Bike Rentals by Temperature and Humidity'
     )
 
     st.altair_chart(cluster_heatmap, use_container_width=True)
 
-    # Display raw data
-    if st.checkbox('Show Raw Data'):
-        st.subheader('Raw Data')
-        st.write(filtered_data)
+    # Find the cluster with the highest average rentals
+    max_cluster = cluster_data.loc[cluster_data['total_count'].idxmax()]
+    min_cluster = cluster_data.loc[cluster_data['total_count'].idxmin()]
+
+    st.write(f"""
+    Analisis clustering sederhana menunjukkan:
+    - Cluster dengan peminjaman tertinggi: {max_cluster['temp_bin']} temperature dan {max_cluster['humidity_bin']} humidity, dengan rata-rata {max_cluster['total_count']:.2f} peminjaman.
+    - Cluster dengan peminjaman terendah: {min_cluster['temp_bin']} temperature dan {min_cluster['humidity_bin']} humidity, dengan rata-rata {min_cluster['total_count']:.2f} peminjaman.
+    - Perbedaan antara cluster tertinggi dan terendah adalah {max_cluster['total_count'] - min_cluster['total_count']:.2f} peminjaman.
+    """)
+
+    # Correlation Analysis
+    st.header('7. Correlation Analysis')
+
+    # Select numeric columns for correlation
+    numeric_columns = ['temperature', 'feels_like_temperature', 'humidity', 'windspeed', 'total_count']
+    corr_data = filtered_data[numeric_columns]
+
+    # Calculate correlation matrix
+    corr_matrix = corr_data.corr()
+
+    # Create a heatmap of the correlation matrix
+    corr_heatmap = alt.Chart(corr_matrix.reset_index().melt('index')).mark_rect().encode(
+        x='index:O',
+        y='variable:O',
+        color='value:Q',
+        tooltip=['index', 'variable', 'value']
+    ).properties(
+        width=500,
+        height=400,
+        title='Correlation Heatmap of Numeric Variables'
+    )
+
+    st.altair_chart(corr_heatmap, use_container_width=True)
+
+    # Find the highest positive and negative correlations with total_count
+    correlations = corr_matrix['total_count'].sort_values(ascending=False)
+    highest_pos_corr = correlations.iloc[1]  # Exclude self-correlation
+    highest_neg_corr = correlations.iloc[-1]
+
+    st.write(f"""
+    Analisis korelasi menunjukkan:
+    - Variabel dengan korelasi positif tertinggi terhadap jumlah peminjaman: {correlations.index[1]} ({highest_pos_corr:.2f})
+    - Variabel dengan korelasi negatif tertinggi terhadap jumlah peminjaman: {correlations.index[-1]} ({highest_neg_corr:.2f})
+    - Suhu memiliki korelasi {' positif ' if corr_matrix['temperature']['total_count'] > 0 else ' negatif '} dengan jumlah peminjaman.
+    - Kelembaban memiliki korelasi {' positif ' if corr_matrix['humidity']['total_count'] > 0 else ' negatif '} dengan jumlah peminjaman.
+    """)
+
+    # Conclusion
+    st.header('8. Kesimpulan dan Rekomendasi')
+
+    st.write("""
+    Berdasarkan analisis yang telah dilakukan, beberapa kesimpulan dan rekomendasi yang dapat diambil:
+
+    1. Pengaruh Cuaca:
+       - Cuaca yang cerah cenderung menghasilkan peminjaman sepeda yang lebih tinggi.
+       - Rekomendasi: Tingkatkan ketersediaan sepeda pada hari-hari dengan prakiraan cuaca baik.
+
+    2. Hari Kerja vs Hari Libur:
+       - Terdapat perbedaan pola peminjaman antara hari kerja dan hari libur.
+       - Rekomendasi: Sesuaikan strategi distribusi sepeda berdasarkan tipe hari.
+
+    3. Tren Harian:
+       - Terdapat puncak peminjaman pada jam-jam tertentu, terutama pada hari kerja.
+       - Rekomendasi: Pastikan ketersediaan sepeda maksimal pada jam-jam puncak.
+
+    4. Analisis RFM:
+       - Identifikasi segmen pelanggan berdasarkan frekuensi dan nilai peminjaman.
+       - Rekomendasi: Kembangkan program loyalitas untuk pelanggan dengan skor RFM tinggi.
+
+    5. Dekomposisi Time Series:
+       - Terdapat pola musiman dalam peminjaman sepeda.
+       - Rekomendasi: Antisipasi fluktuasi permintaan berdasarkan pola musiman yang teridentifikasi.
+
+    6. Clustering:
+       - Kondisi cuaca tertentu (suhu dan kelembaban) memiliki pengaruh signifikan terhadap peminjaman.
+       - Rekomendasi: Optimalkan layanan berdasarkan prakiraan kondisi cuaca.
+
+    7. Korelasi:
+       - Faktor cuaca memiliki korelasi yang signifikan dengan jumlah peminjaman.
+       - Rekomendasi: Gunakan data cuaca untuk memprediksi dan mengantisipasi permintaan.
+
+    Implementasi rekomendasi ini diharapkan dapat meningkatkan efisiensi layanan dan kepuasan pelanggan.
+    """)
+
+    # Add a footer
+    st.markdown("---")
+    st.markdown("Dashboard created by bagus erwanto")
+    st.markdown("Data last updated on: " + str(data['date'].max().date()))
