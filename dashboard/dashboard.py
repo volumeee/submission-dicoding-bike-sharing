@@ -193,7 +193,7 @@ def rfm_analysis(filtered_data):
     - Skor RFM terendah adalah {rfm['RFM_Score'].min():.2f}, yang mungkin memerlukan strategi perbaikan khusus.
     
     Wawasan tambahan:
-    - Jam paling berharga adalah {best_hour}:00, dengan Skor RFM {rfm['RFM_Score'].max():.2f}.
+    - Jam paling berharga adalah {best}:00, dengan Skor RFM {rfm['RFM_Score'].max():.2f}.
     - Jam paling kurang berharga adalah {worst_hour}:00, dengan Skor RFM {rfm['RFM_Score'].min():.2f}.
     - Jam-jam dengan skor RFM tinggi mungkin merupakan target yang baik untuk promosi atau peningkatan ketersediaan layanan.
     - Jam-jam dengan skor RFM rendah mungkin memerlukan strategi untuk meningkatkan penyewaan sepeda, seperti diskon khusus di luar jam sibuk.
